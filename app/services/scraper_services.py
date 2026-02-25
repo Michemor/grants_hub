@@ -1,16 +1,11 @@
 import serpapi
 from datetime import datetime
-import os
 import re
-from dotenv import load_dotenv
 import json
 
-
-load_dotenv()
-
 class ScraperService:
-        def __init__(self, api_key=None, query_file="configs/search_queries.json"):
-           self.api_key = os.getenv("SERP_API") if api_key is None else api_key
+        def __init__(self, api_key, query_file):
+           self.api_key = api_key
            self.query_file = query_file
            self.search_config = self.load_search_config()
 
@@ -22,7 +17,7 @@ class ScraperService:
             params = {
                 "engine": search_engine,
                 "q": query,
-                "tbs": "qdr:m",  # Filter results from the past year
+                "tbs": "qdr:m",  # Filter results from the past month
                 "api_key": self.api_key,
                 "num": result_limit
             }
@@ -64,6 +59,8 @@ class ScraperService:
                         "deadline": deadline,
                         "date_scraped": scraped_at
                     })
+
+
             return all_grants
              
               
