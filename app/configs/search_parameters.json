@@ -1,0 +1,218 @@
+{
+  "School of Law": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "legal research grant 2026 open call",
+      "human rights funding call for proposals",
+      "international law research funding opportunity",
+      "constitutional law research grant deadline"
+    ],
+    "priority_keywords": [
+      "grant",
+      "funding",
+      "call for proposals",
+      "research",
+      "deadline",
+      "apply"
+    ],
+    "exclude_keywords": [
+      "blog",
+      "news",
+      "report",
+      "recap",
+      "conference summary"
+    ]
+  },
+
+  "Graduate School": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "graduate research fellowship 2026",
+      "masters phd research funding international",
+      "doctoral funding opportunity open call",
+      "graduate scholarship application deadline"
+    ],
+    "priority_keywords": [
+      "fellowship",
+      "scholarship",
+      "research grant",
+      "application deadline"
+    ],
+    "exclude_keywords": [
+      "undergraduate",
+      "news",
+      "announcement recap"
+    ]
+  },
+
+  "School of Business and Economics": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "entrepreneurship research grant 2026",
+      "economic development funding opportunity",
+      "startup innovation research funding",
+      "business research grant deadline"
+    ],
+    "priority_keywords": [
+      "funding",
+      "innovation",
+      "grant",
+      "economic research"
+    ],
+    "exclude_keywords": [
+      "stock news",
+      "market recap",
+      "financial report"
+    ]
+  },
+
+  "School of Applied Human Sciences": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "community development research grant",
+      "social work funding opportunity",
+      "human development research funding",
+      "public health social funding open call"
+    ],
+    "priority_keywords": [
+      "community",
+      "grant",
+      "funding",
+      "social research"
+    ],
+    "exclude_keywords": [
+      "news",
+      "press release"
+    ]
+  },
+
+  "School of Arts and Social Sciences": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "arts research funding open call",
+      "social sciences grant 2026 deadline",
+      "cultural studies research grant",
+      "creative arts funding opportunity"
+    ],
+    "priority_keywords": [
+      "grant",
+      "funding",
+      "research",
+      "creative"
+    ],
+    "exclude_keywords": [
+      "event recap",
+      "gallery review"
+    ]
+  },
+
+  "School of Communication": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "media research grant open call",
+      "journalism funding opportunity 2026",
+      "digital communication research grant",
+      "broadcast media funding application"
+    ],
+    "priority_keywords": [
+      "media",
+      "grant",
+      "funding",
+      "communication research"
+    ],
+    "exclude_keywords": [
+      "news article",
+      "opinion piece"
+    ]
+  },
+
+  "School of Psychology": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "psychology research grant deadline",
+      "mental health funding open call",
+      "behavioral science research funding",
+      "clinical psychology research grant"
+    ],
+    "priority_keywords": [
+      "mental health",
+      "research",
+      "grant",
+      "clinical"
+    ],
+    "exclude_keywords": [
+      "therapy blog",
+      "advice article"
+    ]
+  },
+
+  "School of Education": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "education research grant open call",
+      "curriculum development funding opportunity",
+      "teacher training research funding",
+      "educational innovation grant 2026"
+    ],
+    "priority_keywords": [
+      "education",
+      "grant",
+      "funding",
+      "curriculum"
+    ],
+    "exclude_keywords": [
+      "school news",
+      "education blog"
+    ]
+  },
+
+  "School of Nursing": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "nursing research grant deadline",
+      "clinical nursing funding opportunity",
+      "public health nursing research grant",
+      "global nursing funding open call"
+    ],
+    "priority_keywords": [
+      "nursing",
+      "clinical",
+      "health research",
+      "grant"
+    ],
+    "exclude_keywords": [
+      "hospital news",
+      "patient story"
+    ]
+  },
+
+  "School of Science, Engineering and Health": {
+    "search_engine": "google",
+    "result_limit": 20,
+    "queries": [
+      "STEM research grant 2026 open call",
+      "engineering innovation funding opportunity",
+      "biomedical research funding deadline",
+      "technology research grant international"
+    ],
+    "priority_keywords": [
+      "STEM",
+      "engineering",
+      "health",
+      "research grant"
+    ],
+    "exclude_keywords": [
+      "tech news",
+      "product review"
+    ]
+  }
+}
