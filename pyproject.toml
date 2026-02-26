@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "grants-intelligence-hub"
 version = "0.1.0"
@@ -17,3 +21,7 @@ dependencies = [
     "supabase>=2.28.0",
     "uvicorn>=0.41.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "app"]
+testpaths = ["app/tests"]

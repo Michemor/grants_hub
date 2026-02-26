@@ -1,10 +1,13 @@
 import re
 import hashlib
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
+import time
 from typing import List, Dict, Any, Optional
 from dateutil import parser
 import json
 from google import genai
+import os
+from pathlib import Path
 
 class FilterService:
     """
@@ -15,7 +18,8 @@ class FilterService:
     def __init__(self, search_config: Dict[str, Any] = None):
         self.search_config = search_config
         self.today = datetime.now()
-        self.max_deadline = self.today + timedelta(days=7) 
+        self.max_deadline = self.today + timedelta(days=365)
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     def process_grants(self, raw_grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -24,9 +28,15 @@ class FilterService:
         normalized_grants = self._normalize_grant(raw_grants)
         unique_grants = self._deduplicate_grants(normalized_grants)
         relevant_grants = self._filter_by_relevance(unique_grants)
-        classified_grants = self._ai_classify(relevant_grants)
-        valid_grants = self._filter_by_deadline(classified_grants)
+        # classified_grants = self._ai_classify(relevant_grants)
+        valid_grants = self._filter_by_deadline(relevant_grants)
 
+        # for testing purposes to store the filtered grants in a json file
+        current_dir = Path(__file__).resolve().parent
+        config_path = current_dir.parent / "configs" / "filtered_grants.json"
+        
+        with open(config_path, "w") as f:
+            json.dump(valid_grants, f, indent=4)
         return valid_grants
 
     def _normalize_grant(self, grants: Dict[str, Any]) -> Dict[str, Any]:
@@ -40,6 +50,10 @@ class FilterService:
                 "title": grant.get("title", "").strip(),
                 "snippet": grant.get("snippet", "").strip(),
                 "funding_link": grant.get("funding_link", "").strip(),
+                "organization": grant.get("organization", "").strip(),
+                "source": grant.get("source", "").strip(),
+                "deadline": grant.get("deadline", "").strip(),
+                "date_scraped": grant.get("date_scraped", "").strip(),
                 "school": grant.get("school", "").strip(),
             }
             normalized_grants.append(normalized_grant)
@@ -54,9 +68,11 @@ class FilterService:
             prompt = self._build_prompt(grant)
 
             try:
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config=genai.GenerationConfig(
+                # Use standard gemini-1.5-flash-8b model name
+                response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(
                         response_mime_type="application/json",
                         temperature=0.2
                     )
@@ -65,15 +81,17 @@ class FilterService:
                 metadata = json.loads(response.text)
 
                 grant["ai_metadata"] = metadata
-                grant["ai_confidence"] = metadata.get("confidence_score", 0.0)
+                grant["ai_confidence_score"] = metadata.get("confidence_score", 0.0)
 
             except Exception as e:
                 print(f"AI classification failed for '{grant.get('title')}': {e}")
 
                 grant["ai_metadata"] = None
-                grant["ai_confidence"] = 0.0
+                grant["ai_confidence_score"] = 0.0
 
-            time.sleep(4)  # Respect API limits
+            # Sleep 5 seconds between requests to strictly respect the Gemini free tier limit of 15 RPM.
+            # (60 seconds / 15 requests = 4 seconds/request. We add 1 second padding for safety).
+            time.sleep(5)  # Respect API limits
 
         return grants 
     
@@ -186,7 +204,6 @@ class FilterService:
             - academic_level: ["Undergraduate", "Masters", "PhD", "Postdoc", "Faculty", "Institutional"]
             - eligible_entities: ["Individual Researcher", "University", "NGO", "Startup", "SME", "Government", "Consortium"]
             - geographic_scope: e.g., "Global", "Africa", "Kenya", "Europe"
-            - funding_amount: Extract if mentioned, otherwise "Not specified"
             - has_deadline: true if a deadline is clearly stated
             - is_research_grant: true only if this is genuinely research-focused funding
             - confidence_score: 0.0–1.0 based on classification certainty

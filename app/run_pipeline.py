@@ -2,11 +2,11 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
-from app.services.scraper_services import ScraperService
-from app.services.filter_service import FilterService
-from app.services.storage_service import StorageService
+from .services.scraper_services import ScraperService
+from .services.filter_service import FilterService
+from .services.storage_service import StorageService
 
-def run_pipeline():
+def run_pipeline(use_cache: bool = False):
     # Load environment variables
     load_dotenv()
     api_key = os.getenv("SERP_API")
@@ -24,6 +24,12 @@ def run_pipeline():
     
     # Scrape data
     scraper_service = ScraperService(api_key=api_key, query_file=app_dir)
+
+    if use_cache:
+        # Uses cache
+        scraper_service.cache_max_age_hours = float('inf')
+        print("Running pipeline with caching enabled.")
+
     search_config = scraper_service.load_search_config()
     raw_grants = scraper_service.run()
 
@@ -38,6 +44,7 @@ def run_pipeline():
 
     # Store data
     print(f"Storing {len(cleaned_grants)} cleaned grants into the database...")
+    storage_service.store_schools_from_config(app_dir)
     storage_service.store_grants(cleaned_grants)
 
     print("Pipeline execution completed successfully.")

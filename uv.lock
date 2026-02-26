@@ -623,7 +623,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/77/30/b3a6f6a2e00f81535
 [[package]]
 name = "grants-intelligence-hub"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "apscheduler" },
     { name = "fastapi" },
