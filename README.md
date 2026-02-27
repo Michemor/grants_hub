@@ -86,7 +86,6 @@ python -m app.run_pipeline
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-
 | GET | `/api` | Health check |
 | GET | `/api/grants` | Retrieve all grants |
 | GET | `/api/grants/search?query=<term>` | Search grants by title |
