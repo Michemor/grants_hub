@@ -98,17 +98,14 @@ app = FastAPI(
     version="1.0.0",
 )
 
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")
-
-origins_list = [
-    origin.strip() 
-    for origin in allowed_origins_str.split(",") 
-    if origin.strip()
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://grants-intelligence-hub.vercel.app",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_list,
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
     allow_credentials=True,
