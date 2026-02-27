@@ -1,14 +1,14 @@
 {
   "School of Law": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "legal research grant 2026 open call",
       "human rights funding call for proposals",
       "international law research funding opportunity",
       "constitutional law research grant deadline"
     ],
-    "priority_keywords": [
+    "priority": [
       "grant",
       "funding",
       "call for proposals",
@@ -16,7 +16,7 @@
       "deadline",
       "apply"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "blog",
       "news",
       "report",
@@ -27,20 +27,20 @@
 
   "Graduate School": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "graduate research fellowship 2026",
       "masters phd research funding international",
       "doctoral funding opportunity open call",
       "graduate scholarship application deadline"
     ],
-    "priority_keywords": [
+    "priority": [
       "fellowship",
       "scholarship",
       "research grant",
       "application deadline"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "undergraduate",
       "news",
       "announcement recap"
@@ -49,20 +49,20 @@
 
   "School of Business and Economics": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "entrepreneurship research grant 2026",
       "economic development funding opportunity",
       "startup innovation research funding",
       "business research grant deadline"
     ],
-    "priority_keywords": [
+    "priority": [
       "funding",
       "innovation",
       "grant",
       "economic research"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "stock news",
       "market recap",
       "financial report"
@@ -71,20 +71,20 @@
 
   "School of Applied Human Sciences": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "community development research grant",
       "social work funding opportunity",
       "human development research funding",
       "public health social funding open call"
     ],
-    "priority_keywords": [
+    "priority": [
       "community",
       "grant",
       "funding",
       "social research"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "news",
       "press release"
     ]
@@ -92,20 +92,20 @@
 
   "School of Arts and Social Sciences": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "arts research funding open call",
       "social sciences grant 2026 deadline",
       "cultural studies research grant",
       "creative arts funding opportunity"
     ],
-    "priority_keywords": [
+    "priority": [
       "grant",
       "funding",
       "research",
       "creative"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "event recap",
       "gallery review"
     ]
@@ -113,20 +113,20 @@
 
   "School of Communication": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "media research grant open call",
       "journalism funding opportunity 2026",
       "digital communication research grant",
       "broadcast media funding application"
     ],
-    "priority_keywords": [
+    "priority": [
       "media",
       "grant",
       "funding",
       "communication research"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "news article",
       "opinion piece"
     ]
@@ -134,20 +134,20 @@
 
   "School of Psychology": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "psychology research grant deadline",
       "mental health funding open call",
       "behavioral science research funding",
       "clinical psychology research grant"
     ],
-    "priority_keywords": [
+    "priority": [
       "mental health",
       "research",
       "grant",
       "clinical"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "therapy blog",
       "advice article"
     ]
@@ -155,20 +155,20 @@
 
   "School of Education": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "education research grant open call",
       "curriculum development funding opportunity",
       "teacher training research funding",
       "educational innovation grant 2026"
     ],
-    "priority_keywords": [
+    "priority": [
       "education",
       "grant",
       "funding",
       "curriculum"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "school news",
       "education blog"
     ]
@@ -176,20 +176,20 @@
 
   "School of Nursing": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "nursing research grant deadline",
       "clinical nursing funding opportunity",
       "public health nursing research grant",
       "global nursing funding open call"
     ],
-    "priority_keywords": [
+    "priority": [
       "nursing",
       "clinical",
       "health research",
       "grant"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "hospital news",
       "patient story"
     ]
@@ -197,20 +197,20 @@
 
   "School of Science, Engineering and Health": {
     "search_engine": "google",
-    "result_limit": 20,
+    "result_limit": 5,
     "queries": [
       "STEM research grant 2026 open call",
       "engineering innovation funding opportunity",
       "biomedical research funding deadline",
       "technology research grant international"
     ],
-    "priority_keywords": [
+    "priority": [
       "STEM",
       "engineering",
       "health",
       "research grant"
     ],
-    "exclude_keywords": [
+    "exclude": [
       "tech news",
       "product review"
     ]

@@ -1,182 +1,368 @@
 import re
 import hashlib
-from datetime import datetime, timedelta
+import logging
 import time
-from typing import List, Dict, Any, Optional
-from dateutil import parser
 import json
-from google import genai
 import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 from pathlib import Path
+
+from dateutil import parser
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+# Constants
+DEFAULT_MAX_DEADLINE_DAYS = 365
+DEFAULT_RELEVANCE_THRESHOLD = 2
+AI_RATE_LIMIT_SECONDS = 5
+PRIORITY_WEIGHT = 2
+EXCLUDE_WEIGHT = 2
+
 
 class FilterService:
     """
     Service to filter and process scraped grant data.
-    This service applies various filters to ensure that the grants are relevant and up-to-date.
+
+    This service applies various filters to ensure that the grants
+    are relevant and up-to-date.
     """
 
-    def __init__(self, search_config: Dict[str, Any] = None):
-        self.search_config = search_config
-        self.today = datetime.now()
-        self.max_deadline = self.today + timedelta(days=365)
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    def __init__(
+        self,
+        search_config: Dict[str, Any] | None = None,
+        max_deadline_days: int = DEFAULT_MAX_DEADLINE_DAYS,
+        relevance_threshold: int = DEFAULT_RELEVANCE_THRESHOLD,
+        enable_debug_output: bool = False,
+    ):
+        """
+        Initialize the FilterService.
+
+        Args:
+            search_config: Dictionary mapping school names to their config
+            max_deadline_days: Maximum days ahead for valid deadlines
+            relevance_threshold: Minimum score for a grant to be considered relevant
+            enable_debug_output: Whether to write debug JSON files
+        """
+        self.search_config = search_config or {}
+        self.max_deadline_days = max_deadline_days
+        self.relevance_threshold = relevance_threshold
+        self.enable_debug_output = enable_debug_output
+        self._genai_client = None  # Lazy initialization
+
+    @property
+    def _today(self) -> datetime:
+        """Get current date (computed fresh each time for long-running processes)."""
+        return datetime.now()
+
+    @property
+    def _max_deadline(self) -> datetime:
+        """Get maximum acceptable deadline date."""
+        return self._today + timedelta(days=self.max_deadline_days)
+
+    @property
+    def genai_client(self):
+        """Lazy-initialize the Gemini AI client only when needed."""
+        if self._genai_client is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "GEMINI_API_KEY environment variable is required for AI classification"
+                )
+            from google import genai
+
+            self._genai_client = genai.Client(api_key=api_key)
+        return self._genai_client
 
     def process_grants(self, raw_grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Process and filter raw grants based on relevance and deadlines.
-        """
-        normalized_grants = self._normalize_grant(raw_grants)
-        unique_grants = self._deduplicate_grants(normalized_grants)
-        relevant_grants = self._filter_by_relevance(unique_grants)
-        # classified_grants = self._ai_classify(relevant_grants)
-        valid_grants = self._filter_by_deadline(relevant_grants)
 
-        # for testing purposes to store the filtered grants in a json file
-        current_dir = Path(__file__).resolve().parent
-        config_path = current_dir.parent / "configs" / "filtered_grants.json"
-        
-        with open(config_path, "w") as f:
-            json.dump(valid_grants, f, indent=4)
+        Pipeline steps:
+        1. Normalize grant data format
+        2. Remove duplicates
+        3. Filter by relevance score
+        4. (Optional) AI classification
+        5. Filter by deadline validity
+
+        Args:
+            raw_grants: List of raw grant dictionaries from scraper
+
+        Returns:
+            List of filtered, valid grant dictionaries
+        """
+        logger.info(f"Starting grant processing pipeline with {len(raw_grants)} grants")
+
+        normalized_grants = self._normalize_grants(raw_grants)
+        logger.debug(f"Normalized {len(normalized_grants)} grants")
+
+        unique_grants = self._deduplicate_grants(normalized_grants)
+        logger.info(f"Deduplicated to {len(unique_grants)} unique grants")
+
+        relevant_grants = self._filter_by_relevance(unique_grants)
+        logger.info(f"Filtered to {len(relevant_grants)} relevant grants")
+
+        # AI classification is disabled by default (uncomment to enable)
+        # relevant_grants = self._ai_classify(relevant_grants)
+
+        valid_grants = self._filter_by_deadline(relevant_grants)
+        logger.info(f"Final result: {len(valid_grants)} grants with valid deadlines")
+
+        # Debug output (only if enabled)
+        if self.enable_debug_output:
+            self._write_debug_output(valid_grants)
+
         return valid_grants
 
-    def _normalize_grant(self, grants: Dict[str, Any]) -> Dict[str, Any]:
+    def _write_debug_output(self, grants: List[Dict[str, Any]]) -> None:
+        """Write grants to JSON file for debugging purposes."""
+        try:
+            output_path = (
+                Path(__file__).resolve().parent.parent
+                / "configs"
+                / "filtered_grants.json"
+            )
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(grants, f, indent=4, default=str)
+            logger.debug(f"Debug output written to {output_path}")
+        except IOError as e:
+            logger.warning(f"Failed to write debug output: {e}")
+
+    def _normalize_grants(self, grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Normalize grant data to ensure consistent formatting.
+
+        Args:
+            grants: List of raw grant dictionaries
+
+        Returns:
+            List of normalized grant dictionaries with stripped strings
         """
         normalized_grants = []
+        required_fields = [
+            "title",
+            "snippet",
+            "funding_link",
+            "organization",
+            "source",
+            "deadline",
+            "date_scraped",
+            "school",
+        ]
 
         for grant in grants:
             normalized_grant = {
-                "title": grant.get("title", "").strip(),
-                "snippet": grant.get("snippet", "").strip(),
-                "funding_link": grant.get("funding_link", "").strip(),
-                "organization": grant.get("organization", "").strip(),
-                "source": grant.get("source", "").strip(),
-                "deadline": grant.get("deadline", "").strip(),
-                "date_scraped": grant.get("date_scraped", "").strip(),
-                "school": grant.get("school", "").strip(),
+                field: str(grant.get(field, "")).strip() for field in required_fields
             }
             normalized_grants.append(normalized_grant)
+
         return normalized_grants
 
     def _ai_classify(self, grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Classifies research grants using Gemini and attaches structured metadata."""
+        """
+        Classify research grants using Gemini AI and attach structured metadata.
 
-        print(f"Starting AI Classification for {len(grants)} grants...")
+        Args:
+            grants: List of grant dictionaries to classify
 
-        for grant in grants:
+        Returns:
+            List of grants with ai_metadata and ai_confidence_score added
+        """
+        from google import genai as genai_module
+
+        logger.info(f"Starting AI classification for {len(grants)} grants...")
+
+        for i, grant in enumerate(grants, 1):
             prompt = self._build_prompt(grant)
 
             try:
-                # Use standard gemini-1.5-flash-8b model name
-                response = self.client.models.generate_content(
-                    model='gemini-2.5-flash',
+                response = self.genai_client.models.generate_content(
+                    model="gemini-2.5-flash",
                     contents=prompt,
-                    config=genai.types.GenerateContentConfig(
+                    config=genai_module.types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        temperature=0.2
-                    )
+                        temperature=0.2,
+                    ),
                 )
 
                 metadata = json.loads(response.text)
-
                 grant["ai_metadata"] = metadata
                 grant["ai_confidence_score"] = metadata.get("confidence_score", 0.0)
+                logger.debug(
+                    f"Classified grant {i}/{len(grants)}: {grant.get('title', '')[:50]}"
+                )
 
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Failed to parse AI response for '{grant.get('title')}': {e}"
+                )
+                grant["ai_metadata"] = None
+                grant["ai_confidence_score"] = 0.0
             except Exception as e:
-                print(f"AI classification failed for '{grant.get('title')}': {e}")
-
+                logger.error(
+                    f"AI classification failed for '{grant.get('title')}': {e}"
+                )
                 grant["ai_metadata"] = None
                 grant["ai_confidence_score"] = 0.0
 
-            # Sleep 5 seconds between requests to strictly respect the Gemini free tier limit of 15 RPM.
-            # (60 seconds / 15 requests = 4 seconds/request. We add 1 second padding for safety).
-            time.sleep(5)  # Respect API limits
+            # Rate limiting: 15 RPM on free tier (4s/request + 1s padding)
+            time.sleep(AI_RATE_LIMIT_SECONDS)
 
-        return grants 
-    
+        logger.info("AI classification completed")
+        return grants
+
     def _deduplicate_grants(self, grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Remove duplicate grants based on a hash of the title and funding link.
+
+        Args:
+            grants: List of grant dictionaries
+
+        Returns:
+            List of unique grants (duplicates removed)
         """
-        seen_hashes = set()
+        seen_hashes: set[str] = set()
         unique_grants = []
 
         for grant in grants:
-            identifier = self.__generate_grant_hash(grant)
-            if identifier not in seen_hashes:
-                seen_hashes.add(identifier)
+            grant_hash = self._generate_grant_hash(grant)
+            if grant_hash not in seen_hashes:
+                seen_hashes.add(grant_hash)
                 unique_grants.append(grant)
 
         return unique_grants
-    
-    def _filter_by_relevance(self, grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def _filter_by_relevance(
+        self, grants: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Filter grants based on relevance to the specified schools and keywords.
+
+        Scoring:
+        - +2 points for each priority keyword found
+        - -2 points for each exclude keyword found
+        - Grants must meet relevance_threshold to be included
+
+        Args:
+            grants: List of grant dictionaries
+
+        Returns:
+            List of grants that meet the relevance threshold
         """
         relevant_grants = []
 
         for grant in grants:
             school = grant.get("school", "")
             config = self.search_config.get(school, {})
-            priority = config.get("priority", [])
-            exclude = config.get("exclude", [])
+            priority_keywords = config.get("priority", [])
+            exclude_keywords = config.get("exclude", [])
 
-            text = f"{grant.get('title', '')} {grant.get('snippet', '')}".lower()
-            score = 0
+            # Combine title and snippet for keyword matching
+            searchable_text = (
+                f"{grant.get('title', '')} {grant.get('snippet', '')}".lower()
+            )
 
-            score += sum(2 for word in priority if word.lower() in text)
-            score -= sum(2 for word in exclude if word.lower() in text)
-            
+            # Calculate relevance score
+            priority_score = sum(
+                PRIORITY_WEIGHT
+                for word in priority_keywords
+                if word.lower() in searchable_text
+            )
+            exclude_penalty = sum(
+                EXCLUDE_WEIGHT
+                for word in exclude_keywords
+                if word.lower() in searchable_text
+            )
+
+            score = priority_score - exclude_penalty
             grant["relevance_score"] = score
 
-            if score >= 2:
+            if score >= self.relevance_threshold:
                 relevant_grants.append(grant)
-        
+
         return relevant_grants
-    
+
     def _filter_by_deadline(self, grants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filters grants to ensure deadlines fall within the acceptable window."""
+        """
+        Filter grants to ensure deadlines fall within the acceptable window.
+
+        Only includes grants with deadlines between today and max_deadline_days ahead.
+
+        Args:
+            grants: List of grant dictionaries
+
+        Returns:
+            List of grants with valid deadlines (deadline field updated to ISO format)
+        """
         valid_grants = []
+        today = self._today
+        max_deadline = self._max_deadline
 
         for grant in grants:
             text_body = f"{grant.get('title', '')} {grant.get('snippet', '')}"
-            deadline = self.__extract_deadline(text_body)
+            deadline = self._extract_deadline(text_body)
 
-            # Ensure deadline exists and falls between today and max_deadline
-            if deadline and self.today <= deadline <= self.max_deadline:
+            if deadline and today <= deadline <= max_deadline:
                 grant["deadline"] = deadline.isoformat()
                 valid_grants.append(grant)
-                
+            else:
+                logger.debug(
+                    f"Excluded grant (invalid deadline): {grant.get('title', '')[:50]}"
+                )
+
         return valid_grants
 
-    def __generate_grant_hash(self, grant: Dict[str, Any]) -> str:
+    def _generate_grant_hash(self, grant: Dict[str, Any]) -> str:
         """
         Generate a unique hash for a grant based on its title and funding link.
+
+        Args:
+            grant: Grant dictionary
+
+        Returns:
+            SHA-256 hash string
         """
-        identifier = f"{grant.get('title', '').lower()}|{grant.get('funding_link', '').lower()}"
+        identifier = (
+            f"{grant.get('title', '').lower()}|{grant.get('funding_link', '').lower()}"
+        )
         return hashlib.sha256(identifier.encode("utf-8")).hexdigest()
 
-    def __extract_deadline(self, text: str) -> Optional[datetime]:
-        """Uses regex and dateutil to find and parse dates from text."""
-        date_patterns = re.findall(
-            r'\b(?:\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s\d{1,2},?\s\d{4}|\d{1,2}/\d{1,2}/\d{4})',
-            text,
-            re.IGNORECASE
+    def _extract_deadline(self, text: str) -> Optional[datetime]:
+        """
+        Extract and parse deadline dates from text using regex patterns.
+
+        Supports formats:
+        - "15 Jan 2026", "January 15, 2026"
+        - "01/15/2026", "15/01/2026"
+
+        Args:
+            text: Text to search for dates
+
+        Returns:
+            Parsed datetime or None if no valid date found
+        """
+        date_pattern = (
+            r"\b(?:"
+            r"\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|"
+            r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s\d{1,2},?\s\d{4}|"
+            r"\d{1,2}/\d{1,2}/\d{4}"
+            r")\b"
         )
 
-        for match in date_patterns:
+        matches = re.findall(date_pattern, text, re.IGNORECASE)
+
+        for match in matches:
             try:
-                # fuzzy=True allows the parser to ignore surrounding text
                 return parser.parse(match, fuzzy=True)
-            except Exception:  
+            except (ValueError, parser.ParserError):
                 continue
 
         return None
-    
+
     def _build_prompt(self, grant: Dict[str, Any]) -> str:
 
-        return (f"""
+        return f"""
             You are an AI system that structures research grant opportunities 
             for a Research Grant Intelligence Platform.
             
@@ -215,4 +401,4 @@ class FilterService:
             Grant Data:
             Title: {grant.get('title')}
             Description: {grant.get('snippet')}
-            """)
+            """
