@@ -67,7 +67,6 @@ class ProcessedGrant(BaseModel):
 class GrantResponse(BaseModel):
     """Single grant response from database."""
 
-    grant_id: Optional[str] = None  # UUID string from database
     title: Optional[str] = None
     description: Optional[str] = None
     link: Optional[str] = None
@@ -84,8 +83,6 @@ class GrantResponse(BaseModel):
 
 class SchoolResponse(BaseModel):
     """Single school response from database."""
-
-    school_id: Optional[str] = None  # UUID string from database
     school_name: Optional[str] = None
     school_description: Optional[Any] = None
     school_abbreviation: Optional[str] = None
