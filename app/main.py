@@ -111,8 +111,21 @@ app.add_middleware(
 
 @app.get("/api")
 async def root():
-    """Health check endpoint."""
-    return {"message": "Daystar Grant hub is live"}
+    """
+    Health check endpoint.
+    """
+
+    instructions = """Welcome to the Daystar Grant Hub API!
+    Available endpoints:
+    - GET /api/grants: Retrieve all grants
+    - GET /api/grants/search?query=...: Search grants by title
+    - GET /api/grants/{school_name}: Get grants for a specific school
+    - GET /api/schools: Retrieve all schools
+    - POST /api/email: Generate an email digest for grant opportunities
+    - GET /api/fetch-grants: Trigger grant fetching and processing
+    """
+    return {"message": "Daystar Grant Hub API is running!", 
+            "instructions": instructions}
 
 
 @app.get("/api/grants", response_model=GrantListResponse)
@@ -120,7 +133,10 @@ async def get_all_grants():
     """Retrieve all grants from the database."""
     try:
         response = app.state.supabase.table("grants").select("*").execute()
-        return {"grants": response.data or []}
+        count_response = app.state.supabase.table("grants").select("*", count="exact").execute()
+        total_grants = count_response.count if count_response.count is not None else "unknown"
+        logger.info(f"Fetched {len(response.data) if response.data else 0} grants from the database.")
+        return {"grants": response.data or [], "total_grants": total_grants}
     except Exception as e:
         logger.error(f"Error fetching grants: {e}", exc_info=True)
         raise HTTPException(
@@ -128,7 +144,7 @@ async def get_all_grants():
         )
 
 
-            # IMPORTANT: /search must come BEFORE /{school_name} to avoid route conflicts
+
 @app.get("/api/grants/search", response_model=GrantListResponse)
 async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
     """Search grants by title."""
@@ -141,7 +157,10 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
             .ilike("title", f"%{sanitized_query}%")
             .execute()
         )
-        return {"grants": response.data or []}
+        count_response = app.state.supabase.table("grants").select("*", count="exact").ilike("title", f"%{sanitized_query}%").execute()
+        total_grants = count_response.count if count_response.count is not None else "unknown"
+        logger.info(f"Search for '{query}' returned {len(response.data) if response.data else 0} grants.")
+        return {"grants": response.data or [], "total_grants": total_grants}
     except Exception as e:
         logger.error(f"Error searching grants: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to search grants.")
@@ -176,6 +195,7 @@ async def get_grants_by_school(school_name: str):
             .execute()
         )
 
+        logger.info(f"Fetched {len(grants_response.data) if grants_response.data else 0} grants for school '{school_name}'.")
         return {"grants": grants_response.data or []}
     except HTTPException:
         raise
@@ -194,6 +214,7 @@ async def get_all_schools():
     """Retrieve all schools from the database."""
     try:
         response = app.state.supabase.table("schools").select("*").execute()
+        logger.info(f"Fetched {len(response.data) if response.data else 0} schools from the database.")
         return {"schools": response.data or []}
     except Exception as e:
         logger.error(f"Error fetching schools: {e}", exc_info=True)
@@ -235,6 +256,7 @@ async def send_email(request: DigestEmail):
         ).strip()
         filename = f"{safe_name}_grant_digest.eml"
 
+        logger.info(f"Generated email digest for {request.school_name} with {len(request.grants)} grants.")
         return Response(
             content=email_message.as_string(),
             media_type="message/rfc822",
@@ -245,6 +267,19 @@ async def send_email(request: DigestEmail):
         logger.error(f"Error generating email: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate email.")
 
+
+@app.get("/api/fetch-grants")
+async def fetch_grants():
+    """Endpoint to trigger grant fetching and processing."""
+    try:
+        run_pipeline()
+        logger.info("Grant fetching and processing completed successfully.")
+        return {"message": "Grant fetching and processing completed successfully."}
+    except Exception as e:
+        logger.error(f"Error in fetch-grants endpoint: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch and process grants."
+        )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
