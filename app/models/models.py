@@ -74,6 +74,7 @@ class GrantResponse(BaseModel):
     funder: Optional[str] = None
     deadline: Optional[str] = None
     school: Optional[str] = None
+    school_abbreviation: Optional[str] = None
     ai_confidence_score: Optional[float] = None
     created_at: Optional[str] = None
 
@@ -87,6 +88,7 @@ class SchoolResponse(BaseModel):
     school_id: Optional[str] = None  # UUID string from database
     school_name: Optional[str] = None
     school_description: Optional[Any] = None
+    school_abbreviation: Optional[str] = None
 
     class Config:
         extra = "allow"

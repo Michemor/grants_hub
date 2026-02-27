@@ -109,6 +109,47 @@ app.add_middleware(
 )
 
 
+def _normalize_grant_schools(rows):
+    """Attach associated schools and derived school fields to each grant row.
+
+    Expects Supabase rows selected with:
+        schools_grants( schools(school_id, school_name, school_abbreviation) )
+
+    Returns a new list where each grant has:
+        - schools: list of school dicts
+        - school: primary school_name (for backward compatibility)
+        - school_abbreviation: primary school_abbreviation
+    """
+    if not rows:
+        return []
+
+    normalized = []
+
+    for grant in rows:
+        # Safely gather schools from the join table
+        schools = []
+        for link in grant.get("schools_grants") or []:
+            school = link.get("schools") if isinstance(link, dict) else None
+            if school:
+                schools.append(school)
+
+        grant["schools"] = schools
+
+        if schools:
+            primary = schools[0]
+            grant["school"] = primary.get("school_name")
+            grant["school_abbreviation"] = primary.get("school_abbreviation")
+        else:
+            grant["school"] = None
+            grant["school_abbreviation"] = None
+
+        # Remove the raw join key to keep the payload clean
+        grant.pop("schools_grants", None)
+        normalized.append(grant)
+
+    return normalized
+
+
 @app.get("/api")
 async def root():
     """
@@ -124,25 +165,41 @@ async def root():
     - POST /api/email: Generate an email digest for grant opportunities
     - GET /api/fetch-grants: Trigger grant fetching and processing
     """
-    return {"message": "Daystar Grant Hub API is running!", 
-            "instructions": instructions}
+    return {
+        "message": "Daystar Grant Hub API is running!",
+        "instructions": instructions,
+    }
 
 
 @app.get("/api/grants", response_model=GrantListResponse)
 async def get_all_grants():
     """Retrieve all grants from the database."""
     try:
-        response = app.state.supabase.table("grants").select("*").execute()
-        count_response = app.state.supabase.table("grants").select("*", count="exact").execute()
-        total_grants = count_response.count if count_response.count is not None else "unknown"
-        logger.info(f"Fetched {len(response.data) if response.data else 0} grants from the database.")
-        return {"grants": response.data or [], "total_grants": total_grants}
+        response = (
+            app.state.supabase.table("grants")
+            .select(
+                "*, "
+                "schools_grants("
+                "  schools(school_id, school_name, school_abbreviation)"
+                ")"
+            )
+            .execute()
+        )
+
+        count_response = (
+            app.state.supabase.table("grants").select("*", count="exact").execute()
+        )
+        total_grants = (
+            count_response.count if count_response.count is not None else "unknown"
+        )
+        grants = _normalize_grant_schools(response.data)
+        logger.info(f"Fetched {len(grants)} grants from the database (with schools).")
+        return {"grants": grants, "total_grants": total_grants}
     except Exception as e:
         logger.error(f"Error fetching grants: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail="Failed to fetch grants from the database."
         )
-
 
 
 @app.get("/api/grants/search", response_model=GrantListResponse)
@@ -153,14 +210,27 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
         sanitized_query = query.replace("%", "\\%").replace("_", "\\_")
         response = (
             app.state.supabase.table("grants")
-            .select("*")
+            .select(
+                "*, "
+                "schools_grants("
+                "  schools(school_id, school_name, school_abbreviation)"
+                ")"
+            )
             .ilike("title", f"%{sanitized_query}%")
             .execute()
         )
-        count_response = app.state.supabase.table("grants").select("*", count="exact").ilike("title", f"%{sanitized_query}%").execute()
-        total_grants = count_response.count if count_response.count is not None else "unknown"
-        logger.info(f"Search for '{query}' returned {len(response.data) if response.data else 0} grants.")
-        return {"grants": response.data or [], "total_grants": total_grants}
+        count_response = (
+            app.state.supabase.table("grants")
+            .select("*", count="exact")
+            .ilike("title", f"%{sanitized_query}%")
+            .execute()
+        )
+        total_grants = (
+            count_response.count if count_response.count is not None else "unknown"
+        )
+        grants = _normalize_grant_schools(response.data)
+        logger.info(f"Search for '{query}' returned {len(grants)} grants.")
+        return {"grants": grants, "total_grants": total_grants}
     except Exception as e:
         logger.error(f"Error searching grants: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to search grants.")
@@ -171,14 +241,16 @@ async def get_grants_by_school(school_name: str):
     """
     Retrieve grants for a specific school.
 
-    Queries the grants table directly using the school column.
+    Uses the schools_grants join table to resolve the many-to-many
+    association between grants and schools.
     """
     try:
-        # Verify school exists
+        # 1) Verify school exists and get its id and abbreviation
         school_response = (
             app.state.supabase.table("schools")
-            .select("school_id")
+            .select("school_id, school_name, school_abbreviation")
             .eq("school_name", school_name)
+            .limit(1)
             .execute()
         )
 
@@ -187,16 +259,39 @@ async def get_grants_by_school(school_name: str):
                 status_code=404, detail=f"School '{school_name}' not found."
             )
 
-        # Query grants directly by school column
-        grants_response = (
-            app.state.supabase.table("grants")
-            .select("*")
-            .eq("school", school_name)
+        school = school_response.data[0]
+        school_id = school.get("school_id")
+
+        # 2) Fetch all grants linked to this school via the join table
+        link_response = (
+            app.state.supabase.table("schools_grants")
+            .select(
+                "grants(*), " "schools(school_id, school_name, school_abbreviation)"
+            )
+            .eq("school_id", school_id)
             .execute()
         )
 
-        logger.info(f"Fetched {len(grants_response.data) if grants_response.data else 0} grants for school '{school_name}'.")
-        return {"grants": grants_response.data or []}
+        grants = []
+        for row in link_response.data or []:
+            grant = row.get("grants") or {}
+            s = row.get("schools")
+
+            if s:
+                grant["schools"] = [s]
+                grant["school"] = s.get("school_name")
+                grant["school_abbreviation"] = s.get("school_abbreviation")
+            else:
+                grant["schools"] = []
+                grant["school"] = None
+                grant["school_abbreviation"] = None
+
+            grants.append(grant)
+
+        logger.info(
+            f"Fetched {len(grants)} grants for school '{school_name}' (id={school_id})."
+        )
+        return {"grants": grants}
     except HTTPException:
         raise
     except Exception as e:
@@ -214,12 +309,60 @@ async def get_all_schools():
     """Retrieve all schools from the database."""
     try:
         response = app.state.supabase.table("schools").select("*").execute()
-        logger.info(f"Fetched {len(response.data) if response.data else 0} schools from the database.")
+        logger.info(
+            f"Fetched {len(response.data) if response.data else 0} schools from the database."
+        )
         return {"schools": response.data or []}
     except Exception as e:
         logger.error(f"Error fetching schools: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail="Failed to fetch schools from the database."
+        )
+
+
+@app.get("/api/grants/{grant_id}/schools", response_model=SchoolListResponse)
+async def get_schools_by_grant(grant_id: str):
+    """Retrieve all schools associated with a specific grant via schools_grants."""
+    try:
+        # Ensure the grant exists
+        grant_check = (
+            app.state.supabase.table("grants")
+            .select("grant_id")
+            .eq("grant_id", grant_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not grant_check.data:
+            raise HTTPException(
+                status_code=404, detail=f"Grant with id '{grant_id}' not found."
+            )
+
+        # Fetch schools linked to this grant via the join table
+        link_response = (
+            app.state.supabase.table("schools_grants")
+            .select(
+                "schools(school_id, school_name, school_description, school_abbreviation)"
+            )
+            .eq("grant_id", grant_id)
+            .execute()
+        )
+
+        schools = [
+            row["schools"] for row in (link_response.data or []) if row.get("schools")
+        ]
+
+        logger.info(f"Fetched {len(schools)} schools for grant_id={grant_id}.")
+        return {"schools": schools}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error fetching schools for grant_id={grant_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch schools for the specified grant.",
         )
 
 
@@ -256,7 +399,9 @@ async def send_email(request: DigestEmail):
         ).strip()
         filename = f"{safe_name}_grant_digest.eml"
 
-        logger.info(f"Generated email digest for {request.school_name} with {len(request.grants)} grants.")
+        logger.info(
+            f"Generated email digest for {request.school_name} with {len(request.grants)} grants."
+        )
         return Response(
             content=email_message.as_string(),
             media_type="message/rfc822",
@@ -280,6 +425,7 @@ async def fetch_grants():
         raise HTTPException(
             status_code=500, detail="Failed to fetch and process grants."
         )
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -187,8 +187,7 @@ class ScraperService:
             ),
             "source": result.get("displayed_link", ""),
             "deadline": self._extract_deadline(snippet),
-            "date_scraped": scraped_at,
-            "school": school,
+            "date_scraped": scraped_at
         }
 
     def _extract_funder(self, title: str, snippet: str, default: str) -> str:

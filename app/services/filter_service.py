@@ -148,7 +148,6 @@ class FilterService:
             "source",
             "deadline",
             "date_scraped",
-            "school",
         ]
 
         for grant in grants:

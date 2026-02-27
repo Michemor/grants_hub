@@ -175,7 +175,6 @@ class StorageService:
             "link": grant.get("funding_link", ""),
             "funder": grant.get("organization", ""),
             "deadline": grant.get("deadline"),
-            "school": grant.get("school", ""),  # Keep school column for direct queries
             "ai_confidence_score": grant.get("relevance_score", 0),
         }
 
