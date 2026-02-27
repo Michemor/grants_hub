@@ -178,7 +178,7 @@ async def get_all_grants():
         response = (
             app.state.supabase.table("grants")
             .select(
-                "*, "
+                "title, description, link, funder, deadline, ai_confidence_score"
                 "schools_grants("
                 "  schools(school_id, school_name, school_abbreviation)"
                 ")"
@@ -187,7 +187,7 @@ async def get_all_grants():
         )
 
         count_response = (
-            app.state.supabase.table("grants").select("*", count="exact").execute()
+            app.state.supabase.table("grants").select("title, description, link, funder, deadline, ai_confidence_score", count="exact").execute()
         )
         total_grants = (
             count_response.count if count_response.count is not None else "unknown"
@@ -211,7 +211,7 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
         response = (
             app.state.supabase.table("grants")
             .select(
-                "*, "
+                "title, description, link, funder, deadline, ai_confidence_score"
                 "schools_grants("
                 "  schools(school_id, school_name, school_abbreviation)"
                 ")"
@@ -248,7 +248,7 @@ async def get_grants_by_school(school_name: str):
         # 1) Verify school exists and get its id and abbreviation
         school_response = (
             app.state.supabase.table("schools")
-            .select("school_id, school_name, school_abbreviation")
+            .select("school_name, school_abbreviation")
             .eq("school_name", school_name)
             .limit(1)
             .execute()
@@ -266,7 +266,7 @@ async def get_grants_by_school(school_name: str):
         link_response = (
             app.state.supabase.table("schools_grants")
             .select(
-                "grants(*), " "schools(school_id, school_name, school_abbreviation)"
+                "grants(title, description, link, funder, deadline, ai_confidence_score), " "schools(school_name, school_abbreviation)"
             )
             .eq("school_id", school_id)
             .execute()
@@ -308,7 +308,7 @@ async def get_grants_by_school(school_name: str):
 async def get_all_schools():
     """Retrieve all schools from the database."""
     try:
-        response = app.state.supabase.table("schools").select("*").execute()
+        response = app.state.supabase.table("schools").select("school_name, school_abbreviation").execute()
         logger.info(
             f"Fetched {len(response.data) if response.data else 0} schools from the database."
         )
@@ -320,23 +320,25 @@ async def get_all_schools():
         )
 
 
-@app.get("/api/grants/{grant_id}/schools", response_model=SchoolListResponse)
-async def get_schools_by_grant(grant_id: str):
+@app.get("/api/grants/{grant_name}/schools", response_model=SchoolListResponse)
+async def get_schools_by_grant(grant_name: str):
     """Retrieve all schools associated with a specific grant via schools_grants."""
     try:
         # Ensure the grant exists
         grant_check = (
             app.state.supabase.table("grants")
             .select("grant_id")
-            .eq("grant_id", grant_id)
+            .eq("grant_name", grant_name)
             .limit(1)
             .execute()
         )
 
         if not grant_check.data:
             raise HTTPException(
-                status_code=404, detail=f"Grant with id '{grant_id}' not found."
+                status_code=404, detail=f"Grant with name '{grant_name}' not found."
             )
+
+        grant_id = grant_check.data[0]["grant_id"]
 
         # Fetch schools linked to this grant via the join table
         link_response = (
@@ -352,13 +354,13 @@ async def get_schools_by_grant(grant_id: str):
             row["schools"] for row in (link_response.data or []) if row.get("schools")
         ]
 
-        logger.info(f"Fetched {len(schools)} schools for grant_id={grant_id}.")
+        logger.info(f"Fetched {len(schools)} schools for grant_name='{grant_name}' (grant_id={grant_id}).")
         return {"schools": schools}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
-            f"Error fetching schools for grant_id={grant_id}: {e}", exc_info=True
+            f"Error fetching schools for grant_name='{grant_name}': {e}", exc_info=True
         )
         raise HTTPException(
             status_code=500,
