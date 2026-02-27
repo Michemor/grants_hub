@@ -178,7 +178,7 @@ async def get_all_grants():
         response = (
             app.state.supabase.table("grants")
             .select(
-                "title, description, link, funder, deadline, ai_confidence_score"
+                "title, description, link, funder, deadline, ai_confidence_score, "
                 "schools_grants("
                 "  schools(school_id, school_name, school_abbreviation)"
                 ")"
@@ -187,7 +187,12 @@ async def get_all_grants():
         )
 
         count_response = (
-            app.state.supabase.table("grants").select("title, description, link, funder, deadline, ai_confidence_score", count="exact").execute()
+            app.state.supabase.table("grants")
+            .select(
+                "title, description, link, funder, deadline, ai_confidence_score",
+                count="exact",
+            )
+            .execute()
         )
         total_grants = (
             count_response.count if count_response.count is not None else "unknown"
@@ -211,7 +216,7 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
         response = (
             app.state.supabase.table("grants")
             .select(
-                "title, description, link, funder, deadline, ai_confidence_score"
+                "title, description, link, funder, deadline, ai_confidence_score, "
                 "schools_grants("
                 "  schools(school_id, school_name, school_abbreviation)"
                 ")"
@@ -266,7 +271,8 @@ async def get_grants_by_school(school_name: str):
         link_response = (
             app.state.supabase.table("schools_grants")
             .select(
-                "grants(title, description, link, funder, deadline, ai_confidence_score), " "schools(school_name, school_abbreviation)"
+                "grants(title, description, link, funder, deadline, ai_confidence_score), "
+                "schools(school_name, school_abbreviation)"
             )
             .eq("school_id", school_id)
             .execute()
@@ -308,7 +314,11 @@ async def get_grants_by_school(school_name: str):
 async def get_all_schools():
     """Retrieve all schools from the database."""
     try:
-        response = app.state.supabase.table("schools").select("school_name, school_abbreviation").execute()
+        response = (
+            app.state.supabase.table("schools")
+            .select("school_name, school_abbreviation")
+            .execute()
+        )
         logger.info(
             f"Fetched {len(response.data) if response.data else 0} schools from the database."
         )
@@ -354,7 +364,9 @@ async def get_schools_by_grant(grant_name: str):
             row["schools"] for row in (link_response.data or []) if row.get("schools")
         ]
 
-        logger.info(f"Fetched {len(schools)} schools for grant_name='{grant_name}' (grant_id={grant_id}).")
+        logger.info(
+            f"Fetched {len(schools)} schools for grant_name='{grant_name}' (grant_id={grant_id})."
+        )
         return {"schools": schools}
     except HTTPException:
         raise
