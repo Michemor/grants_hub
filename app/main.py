@@ -180,7 +180,7 @@ async def get_all_grants():
             .select(
                 "title, description, link, funder, deadline, ai_confidence_score, "
                 "schools_grants("
-                "  schools(school_id, school_name, school_abbreviation)"
+                "  schools(school_name, school_abbreviation)"
                 ")"
             )
             .execute()
@@ -218,7 +218,7 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
             .select(
                 "title, description, link, funder, deadline, ai_confidence_score, "
                 "schools_grants("
-                "  schools(school_id, school_name, school_abbreviation)"
+                "  schools(school_name, school_abbreviation)"
                 ")"
             )
             .ilike("title", f"%{sanitized_query}%")
@@ -354,7 +354,7 @@ async def get_schools_by_grant(grant_name: str):
         link_response = (
             app.state.supabase.table("schools_grants")
             .select(
-                "schools(school_id, school_name, school_description, school_abbreviation)"
+                "schools(school_name, school_description, school_abbreviation)"
             )
             .eq("grant_id", grant_id)
             .execute()

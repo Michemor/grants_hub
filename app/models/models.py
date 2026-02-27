@@ -13,6 +13,9 @@ class GrantItem(BaseModel):
     deadline: str = Field(default="Check link for deadline")
     funding_organization: str = Field(default="Unknown")
     funding_link: str
+    school_name: str = Field(default="Unknown")
+    school_abbreviation: Optional[str] = None
+    ai_confidence_score: Optional[float] = None
 
 
 class DigestEmail(BaseModel):
