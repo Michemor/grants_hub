@@ -163,7 +163,7 @@ async def root():
     Available endpoints:
     - GET /api/grants: Retrieve all grants
     - GET /api/grants/search?query=...: Search grants by title
-    - GET /api/grants/{school_name}: Get grants for a specific school
+    - GET /api/grants/{school_abbreviation}: Get grants for a specific school
     - GET /api/schools: Retrieve all schools
     - POST /api/email: Generate an email digest for grant opportunities
     - GET /api/fetch-grants: Trigger grant fetching and processing
@@ -244,8 +244,8 @@ async def search_grants(query: str = Query(..., min_length=1, max_length=200)):
         raise HTTPException(status_code=500, detail="Failed to search grants.")
 
 
-@app.get("/api/grants/{school_name}", response_model=GrantListResponse)
-async def get_grants_by_school(school_name: str):
+@app.get("/api/grants/{school_abbreviation}", response_model=GrantListResponse)
+async def get_grants_by_school(school_abbreviation: str):
     """
     Retrieve grants for a specific school.
 
@@ -257,14 +257,14 @@ async def get_grants_by_school(school_name: str):
         school_response = (
             app.state.supabase.table("schools")
             .select("school_name, school_abbreviation")
-            .eq("school_name", school_name)
+            .eq("school_abbreviation", school_abbreviation)
             .limit(1)
             .execute()
         )
 
         if not school_response.data:
             raise HTTPException(
-                status_code=404, detail=f"School '{school_name}' not found."
+                status_code=404, detail=f"School '{school_abbreviation}' not found."
             )
 
         school = school_response.data[0]
@@ -298,18 +298,18 @@ async def get_grants_by_school(school_name: str):
             grants.append(grant)
 
         logger.info(
-            f"Fetched {len(grants)} grants for school '{school_name}' (id={school_id})."
+            f"Fetched {len(grants)} grants for school '{school_abbreviation}' (id={school_id})."
         )
         return {"grants": grants}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
-            f"Error fetching grants for school '{school_name}': {e}", exc_info=True
+            f"Error fetching grants for school '{school_abbreviation}': {e}", exc_info=True
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch grants for school '{school_name}'.",
+            detail=f"Failed to fetch grants for school '{school_abbreviation}'.",
         )
 
 
