@@ -333,55 +333,47 @@ async def get_all_schools():
         )
 
 
-@app.get("/api/grants/{grant_name}/schools", response_model=SchoolListResponse)
-async def get_schools_by_grant(grant_name: str):
-    """Retrieve all schools associated with a specific grant via schools_grants."""
+@app.get("/api/schools/grants", response_model=SchoolListResponse)
+async def get_all_grants_by_school():
+    """
+    Retrieve all schools with their associated grants.
+    """
     try:
-        # Ensure the grant exists
-        grant_check = (
-            app.state.supabase.table("grants")
-            .select("grant_id")
-            .eq("grant_name", grant_name)
-            .limit(1)
-            .execute()
-        )
-
-        if not grant_check.data:
-            raise HTTPException(
-                status_code=404, detail=f"Grant with name '{grant_name}' not found."
-            )
-
-        grant_id = grant_check.data[0]["grant_id"]
-
-        # Fetch schools linked to this grant via the join table
-        link_response = (
-            app.state.supabase.table("schools_grants")
+        response = (
+            app.state.supabase.table("schools")
             .select(
-                "schools(school_name, school_description, school_abbreviation)"
+                "school_name, school_abbreviation, "
+                "schools_grants(grants(title, description, link, funder, deadline))"
             )
-            .eq("grant_id", grant_id)
             .execute()
         )
 
-        schools = [
-            row["schools"] for row in (link_response.data or []) if row.get("schools")
-        ]
+        schools = []
+        for school in response.data or []:
+            grants = []
+            for link in school.get("schools_grants") or []:
+                grant = link.get("grants")
+                if grant:
+                    grants.append(grant)
+
+            schools.append(
+                {
+                    "school_name": school.get("school_name"),
+                    "school_abbreviation": school.get("school_abbreviation"),
+                    "grants": grants,
+                }
+            )
 
         logger.info(
-            f"Fetched {len(schools)} schools for grant_name='{grant_name}' (grant_id={grant_id})."
+            f"Fetched {len(schools)} schools with their associated grants from the database."
         )
         return {"schools": schools}
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(
-            f"Error fetching schools for grant_name='{grant_name}': {e}", exc_info=True
-        )
+        logger.error(f"Error fetching schools with grants: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500,
-            detail="Failed to fetch schools for the specified grant.",
+            status_code=500, detail="Failed to fetch schools with their grants."
         )
-
+    
 
 @app.post("/api/email")
 async def send_email(request: DigestEmail):
