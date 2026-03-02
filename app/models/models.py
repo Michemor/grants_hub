@@ -25,9 +25,7 @@ class DigestEmail(BaseModel):
     school_name: str = Field(..., min_length=1, max_length=200)
     grants: List[GrantItem] = Field(..., min_length=1)
 
-
 # ============== Database/Internal Models ==============
-
 
 class ScrapedGrant(BaseModel):
     """Model for grants returned from the scraper service."""

@@ -164,6 +164,7 @@ async def root():
     - GET /api/grants: Retrieve all grants
     - GET /api/grants/search?query=...: Search grants by title
     - GET /api/grants/{school_abbreviation}: Get grants for a specific school
+    - GET /api/schools/grants: Get all schools with their associated grants
     - GET /api/schools: Retrieve all schools
     - POST /api/email: Generate an email digest for grant opportunities
     - GET /api/fetch-grants: Trigger grant fetching and processing
